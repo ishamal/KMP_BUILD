@@ -1,7 +1,13 @@
 TEAM_ID=
 
+// Which store this app builds. A per-store xcconfig (store-<name>.xcconfig) overrides this, or
+// edit it directly. The Run Script passes it to Gradle as -Pstore=$GRADLE_STORE.
+GRADLE_STORE=storeA
+
 PRODUCT_NAME=KmpBuild
-PRODUCT_BUNDLE_IDENTIFIER=com.softlogic.kmpbuild.KmpBuild$(TEAM_ID)
+// Bundle id follows the store so each store installs as its own app. iOS keeps the store's
+// camelCase (…storeA); Android's applicationId is lowercase (…storea) — same store, cosmetic diff.
+PRODUCT_BUNDLE_IDENTIFIER=com.softlogic.kmpbuild.$(GRADLE_STORE)$(TEAM_ID)
 
 CURRENT_PROJECT_VERSION=1
 MARKETING_VERSION=1.0

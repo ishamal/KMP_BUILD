@@ -1,0 +1,10 @@
+// Generated from the STORES catalog by ./gradlew generateIosStore — do not edit.
+// Point a per-store Xcode build configuration at this file (see IOS_PER_STORE_APPS.md).
+#include "Config.xcconfig"
+
+GRADLE_STORE = storeC
+
+// Kotlin can't infer debug/release from a custom configuration name (e.g. "Debug-storeC"),
+// so state it explicitly. Defaults to debug (for Run). For a Release/Archive per-store
+// configuration, set KOTLIN_FRAMEWORK_BUILD_TYPE = release on that configuration.
+KOTLIN_FRAMEWORK_BUILD_TYPE = debug

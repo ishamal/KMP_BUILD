@@ -18,7 +18,7 @@ data class StoreDef(
  * invalidates automatically.
  */
 internal val STORES: List<StoreDef> = listOf(
-    StoreDef("storeA", listOf("login", "cart", "settings", "orders"), "KEELS:USBL,CARGILLS:SENM"),
+    StoreDef("storeA", listOf("login", "cart", "orders"), "KEELS:USBL,CARGILLS:SENM"),
     StoreDef("storeB", listOf("login", "cart", "settings"), "KEELS:USBL"),
     StoreDef("storeC", listOf("login", "cart", "orders"), "KEELS:USBL"),
 )

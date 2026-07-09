@@ -18,6 +18,11 @@ dependencies {
 
     implementation(libs.androidx.activity.compose)
 
+    // Native Android (Jetpack) Compose UI — this app owns its UI; nothing is shared from :shared.
+    implementation(libs.compose.runtime)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui)
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
 }

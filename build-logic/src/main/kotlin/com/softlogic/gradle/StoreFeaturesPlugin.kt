@@ -28,6 +28,12 @@ class StoreFeaturesPlugin : Plugin<Project> {
                         "BUSINESS_UNIT_DEFAULTS",
                         "\"${catalog.businessUnitDefaults(store)}\"",
                     )
+                    // The features this store ships — read by app UI to enable/disable nav tiles.
+                    buildConfigField(
+                        "String",
+                        "STORE_FEATURES",
+                        "\"${catalog.featuresFor(store).joinToString(",")}\"",
+                    )
                 }
             }
 
