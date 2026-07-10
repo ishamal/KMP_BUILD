@@ -34,6 +34,9 @@ dependencyResolutionManagement {
 include(":androidApp")
 include(":shared")
 
+// Shared contracts consumed by every feature + the app graphs.
+include(":core:feature")
+
 // Feature modules — each ships an :api contract and a :real implementation.
 // The STORES table in build-logic decides which :real modules each store compiles in.
 include(":features:login:api")

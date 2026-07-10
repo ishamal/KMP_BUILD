@@ -1,12 +1,17 @@
 package com.softlogic.kmpbuild.features.settings.real
 
-import com.softlogic.kmpbuild.features.settings.api.SettingsFeature
+import com.softlogic.kmpbuild.core.AppScope
+import com.softlogic.kmpbuild.core.HomeFeature
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
 
 /**
- * Real implementation of the "settings" feature. Compiled in only for stores whose STORES entry
- * lists "settings" — build-time exclusion, driven by the storeCatalog.
+ * The "settings" feature. `@ContributesIntoSet` registers it into the app graph's
+ * `Set<HomeFeature>` — but only when this module is compiled in (i.e. the store ships "settings").
  */
-class SettingsFeatureImpl : SettingsFeature {
+@ContributesIntoSet(AppScope::class)
+@Inject
+class SettingsFeatureImpl : HomeFeature {
     override val id: String = "settings"
-    override fun describe(): String = "Settings feature (real implementation)"
+    override val title: String = "Settings"
 }

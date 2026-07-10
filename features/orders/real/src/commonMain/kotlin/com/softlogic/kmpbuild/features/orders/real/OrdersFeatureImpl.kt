@@ -1,12 +1,18 @@
 package com.softlogic.kmpbuild.features.orders.real
 
-import com.softlogic.kmpbuild.features.orders.api.OrdersFeature
+import com.softlogic.kmpbuild.core.AppScope
+import com.softlogic.kmpbuild.core.HomeFeature
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
 
 /**
- * Real implementation of the "orders" feature. Compiled in only for stores whose STORES entry
- * lists "orders" — build-time exclusion, driven by the storeCatalog.
+ * The "orders" feature. `@ContributesIntoSet` registers it into the app graph's
+ * `Set<HomeFeature>` — but only when this module is compiled in (i.e. the store ships "orders").
+ * Single supertype (HomeFeature) → Metro infers the bound type implicitly.
  */
-class OrdersFeatureImpl : OrdersFeature {
+@ContributesIntoSet(AppScope::class)
+@Inject
+class OrdersFeatureImpl : HomeFeature {
     override val id: String = "orders"
-    override fun describe(): String = "Orders feature (real implementation)"
+    override val title: String = "Orders"
 }

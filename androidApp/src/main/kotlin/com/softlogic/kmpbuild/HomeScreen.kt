@@ -28,7 +28,8 @@ private val HOME_ITEMS: List<Pair<String, String>> = listOf(
 
 /**
  * Native Android Jetpack Compose home. [enabledFeatures] are the feature ids compiled into this
- * store's flavor (from BuildConfig.STORE_FEATURES) — a tile is tappable only if its feature shipped.
+ * store's flavor, aggregated at runtime from the Metro graph (Set<HomeFeature> via
+ * @ContributesIntoSet) — a tile is tappable only if its feature shipped.
  */
 @Composable
 fun HomeScreen(enabledFeatures: Set<String>) {

@@ -16,10 +16,11 @@ private let homeItems: [HomeItem] = [
 struct ContentView: View {
     @State private var opened: String? = nil
 
-    // The features compiled into this store's Shared framework build (StoreInfo is generated
-    // per -Pstore in shared/build.gradle.kts). A tile is enabled only if its feature shipped.
+    // The features compiled into this store's Shared framework build, aggregated by the Metro
+    // graph (HomeFeatures wraps createGraph<AppGraph>().features). A tile is enabled only if its
+    // feature shipped in this store.
     private func isEnabled(_ id: String) -> Bool {
-        StoreInfo.shared.isEnabled(feature: id)
+        HomeFeatures.shared.isEnabled(id: id)
     }
 
     var body: some View {

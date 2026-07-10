@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
+    alias(libs.plugins.metro)
 }
 
 kotlin {
@@ -22,6 +23,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":features:cart:api"))
+            implementation(project(":core:feature"))
         }
     }
 }

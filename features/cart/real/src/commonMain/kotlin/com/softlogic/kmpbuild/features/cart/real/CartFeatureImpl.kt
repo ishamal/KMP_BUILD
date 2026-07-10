@@ -1,12 +1,17 @@
 package com.softlogic.kmpbuild.features.cart.real
 
-import com.softlogic.kmpbuild.features.cart.api.CartFeature
+import com.softlogic.kmpbuild.core.AppScope
+import com.softlogic.kmpbuild.core.HomeFeature
+import dev.zacsweers.metro.ContributesIntoSet
+import dev.zacsweers.metro.Inject
 
 /**
- * Real implementation of the "cart" feature. Compiled in only for stores whose STORES entry
- * lists "cart" — build-time exclusion, driven by the storeCatalog.
+ * The "cart" feature. `@ContributesIntoSet` registers it into the app graph's
+ * `Set<HomeFeature>` — but only when this module is compiled in (i.e. the store ships "cart").
  */
-class CartFeatureImpl : CartFeature {
+@ContributesIntoSet(AppScope::class)
+@Inject
+class CartFeatureImpl : HomeFeature {
     override val id: String = "cart"
-    override fun describe(): String = "Cart feature (real implementation)"
+    override val title: String = "Cart"
 }

@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.composeCompiler)
     // Creates one product flavor per store and links only that store's feature :real modules.
     id("com.softlogic.store-features")
+    // Compile-time DI — features self-register into the app graph via @ContributesIntoSet.
+    alias(libs.plugins.metro)
 }
 
 kotlin {
@@ -15,6 +17,7 @@ kotlin {
 }
 dependencies {
     implementation(projects.shared)
+    implementation(projects.core.feature)
 
     implementation(libs.androidx.activity.compose)
 
