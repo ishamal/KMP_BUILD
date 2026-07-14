@@ -157,10 +157,16 @@ plugins {
 ```
 
 Think of it as a **recipe card**. Instead of every kitchen (module) improvising the dish (build
-configuration), you write the recipe once and hand out the card. In this system there are two cards:
+configuration), you write the recipe once and hand out the card. In this system there are three cards:
 
-- **`store-catalog`** — "here is the STORES table, exposed as an object build scripts can query."
+- **`store-catalog`** — "here is the store table, exposed as an object build scripts can query."
 - **`store-features`** — "read the table and wire up the Android build accordingly" (next section).
+- **`store-ios-features`** — the same for iOS: link and export only the chosen store's feature
+  modules into the shared framework.
+
+A useful rule for what goes on a card vs in a module's own build file: **policy and derived wiring →
+plugin; module-specific facts (which targets, names, versions) → the module's script.** The shared
+module's build file doesn't contain the per-store loops — it just applies the card.
 
 The `build-logic` folder is an **included build**: a tiny, separate Gradle project whose only output
 is these plugins. Your main build says `includeBuild("build-logic")` once, and the plugins become
