@@ -96,11 +96,13 @@ head…) that slowly drift apart.
 So the whole configuration is **one small table, written in Kotlin**:
 
 ```kotlin
-val STORES = listOf(
-    StoreDef("storeA", listOf("login", "cart", "orders")),
-    StoreDef("storeB", listOf("login", "cart", "settings")),
-    StoreDef("storeC", listOf("login", "orders")),
-)
+enum class Feature { LOGIN, CART, ORDERS, SETTINGS }    // every feature that exists
+
+enum class Store(val features: List<Feature>) {         // every store and what it ships
+    STORE_A(listOf(Feature.LOGIN, Feature.CART, Feature.ORDERS)),
+    STORE_B(listOf(Feature.LOGIN, Feature.CART, Feature.SETTINGS)),
+    STORE_C(listOf(Feature.LOGIN, Feature.ORDERS)),
+}
 ```
 
 That's it. That's the entire "configuration" of the system. Adding a store = adding one line.
@@ -109,6 +111,32 @@ Why Kotlin and not a JSON/YAML/properties file? Because a Kotlin table is **chec
 (a typo becomes a build error, not silent misbehavior) and needs no file-parsing code. Plain data,
 strongly typed, in exactly one place. This is the **single source of truth** principle: any fact your
 system depends on should have exactly one authoritative home.
+
+Notice that both stores and features are **enums**, not strings. This is the same principle taken one
+step further. With strings, `"ordres"` or `"stroeB"` is a perfectly valid string — you'd only find the
+typo when the build's validation runs. With an enum, the table can only reference constants that
+actually exist: `Feature.ORDRES` **doesn't compile**, your IDE autocompletes the real names, and
+renaming is a safe, tool-assisted refactor. The rule of thumb: **when a value can only be one of a
+known set, teach the type system that set** — then wrong values stop being "caught" and start being
+*impossible to write*.
+
+Strings can't disappear entirely, though: Gradle wants a flavor *named* `"storeA"`, and the command
+line passes `-Pstore=storeB` as text. Those boundary strings are **derived from the enum in one
+place** (`STORE_A` → `"storeA"`) rather than typed by hand at each spot — so even where text is
+unavoidable, there's still exactly one source of it.
+
+One honest limit: the enum guarantees the *name* is real, but it can't know whether the matching
+Gradle module actually exists on disk. A small validation check in the plugin still covers that gap —
+each layer catches what the previous one can't.
+
+> **Don't confuse this `Feature` enum with `HomeFeature` (Section 9).** They live in two different
+> worlds. The enum exists only at **build time**, inside Gradle, and decides *which modules get
+> compiled* — it never ships in the app. `HomeFeature` exists at **runtime**, inside the app, and is
+> how compiled-in features *announce themselves*. They can't be merged: `build-logic` compiles before
+> the app's modules even exist, and build-machine classes can't ship to the phone. They aren't even
+> the same list — `login` is in the enum (it's a linked module) but never implements `HomeFeature`
+> (it's not a home tile). Nothing matches them by name; the build itself is what keeps the two worlds
+> in sync: enum → linked modules → self-registered set.
 
 ---
 
@@ -257,6 +285,12 @@ So there are two kinds of contracts, with different jobs:
   my id and display title." This is what gets multibound and enumerated.
 - **Behaviour** (`OrdersFeature`, in `:features:orders:api`): what *this specific* feature can do.
   Used by code that actually invokes the feature, not by code that lists it.
+
+And the id itself is not a string but a small **enum in `:core:feature`** (`FeatureId`), for the same
+reason as in Section 4: everywhere a feature id appears — the impl that registers, the screen it maps
+to, the home tile, even the Swift side (Kotlin enums bridge into Swift) — the compiler guarantees
+it's a real feature. One `FeatureId.ORDERS` instead of the string `"orders"` copied into five files
+on two platforms.
 
 An analogy: identity is your **conference name badge** (uniform, everyone has one, used by the front
 desk to list attendees); behaviour is your **job skills** (specific to you, used by people who

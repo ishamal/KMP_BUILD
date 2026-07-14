@@ -14,10 +14,12 @@ plugins {
 
 val storeCatalog = extensions.getByType<com.softlogic.gradle.StoreCatalogExtension>()
 // iOS has no Gradle flavors, so the store is chosen with -Pstore=<store> (default = selectedStore).
-// orNull + isNotBlank so an empty `-Pstore=` (e.g. an unset GRADLE_STORE from Xcode) falls back to
-// the default instead of failing with "Unknown store ''".
-val store = providers.gradleProperty("store").orNull?.takeIf { it.isNotBlank() } ?: storeCatalog.selectedStore
-val storeFeatures = storeCatalog.featuresFor(store)
+// The -P value is the one inherently-string boundary; storeFor() converts it to the typed Store
+// once (failing fast with the known names on a typo). orNull + isNotBlank so an empty `-Pstore=`
+// (e.g. an unset GRADLE_STORE from Xcode) falls back to the default instead of failing.
+val store = providers.gradleProperty("store").orNull?.takeIf { it.isNotBlank() }
+    ?.let { storeCatalog.storeFor(it) } ?: storeCatalog.selectedStore
+val storeFeatures = store.features
 
 // Scaffold one xcconfig per store (catalog-driven) so Xcode can point a per-store build
 // configuration at each. Run: ./gradlew generateIosStore  (see documents/IOS_PER_STORE_APPS.md).
@@ -56,8 +58,11 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "Shared"
             isStatic = true
+            // Export the shared feature contracts (FeatureId/HomeFeature) — SwiftUI consumes the
+            // typed ids directly (FeatureId.cart, …) via the HomeFeatures façade.
+            export(project(":core:feature"))
             // Export each shipped feature's :api contract so SwiftUI can consume it.
-            storeFeatures.forEach { export(project(":features:$it:api")) }
+            storeFeatures.forEach { export(project(it.apiModulePath)) }
         }
     }
     
@@ -80,14 +85,15 @@ kotlin {
     sourceSets {
         iosMain {
             dependencies {
-                // The multibound HomeFeature contract + AppScope the graph aggregates.
-                implementation(project(":core:feature"))
+                // The multibound HomeFeature contract + FeatureId + AppScope the graph aggregates.
+                // `api` (not implementation) because it's export()ed into the framework above.
+                api(project(":core:feature"))
                 // Link only this store's feature modules into the single KMP framework —
                 // build-time exclusion, the iOS counterpart to Android's per-flavor deps.
                 // The linked :real modules' @ContributesIntoSet contributions feed the AppGraph.
                 storeFeatures.forEach {
-                    api(project(":features:$it:api"))             // exported contract
-                    implementation(project(":features:$it:real")) // impl, linked but not exported
+                    api(project(it.apiModulePath))             // exported contract
+                    implementation(project(it.realModulePath)) // impl, linked but not exported
                 }
             }
         }

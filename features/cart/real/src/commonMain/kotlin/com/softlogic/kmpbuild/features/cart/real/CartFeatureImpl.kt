@@ -1,6 +1,7 @@
 package com.softlogic.kmpbuild.features.cart.real
 
 import com.softlogic.kmpbuild.core.AppScope
+import com.softlogic.kmpbuild.core.FeatureId
 import com.softlogic.kmpbuild.core.HomeFeature
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -12,6 +13,5 @@ import dev.zacsweers.metro.Inject
 @ContributesIntoSet(AppScope::class)
 @Inject
 class CartFeatureImpl : HomeFeature {
-    override val id: String = "cart"
-    override val title: String = "Cart"
+    override val id: FeatureId = FeatureId.CART
 }

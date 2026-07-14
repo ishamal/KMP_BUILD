@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.softlogic.kmpbuild.core.AndroidFeatureScreen
 import com.softlogic.kmpbuild.core.AppScope
+import com.softlogic.kmpbuild.core.FeatureId
 import com.softlogic.kmpbuild.core.FeatureScreenEntry
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -24,7 +25,7 @@ import dev.zacsweers.metro.Inject
 class SettingsScreenContribution(
     private val graphFactory: SettingsGraph.Factory,
 ) : AndroidFeatureScreen {
-    override val id: String = "settings"
+    override val id: FeatureId = FeatureId.SETTINGS
 
     @Composable
     override fun Content(onBack: () -> Unit) {

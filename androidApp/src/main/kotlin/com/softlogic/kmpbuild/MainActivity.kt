@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.softlogic.kmpbuild.core.FeatureId
 import com.softlogic.kmpbuild.core.MetroAppComponentProvider
 
 class MainActivity : ComponentActivity() {
@@ -30,5 +31,5 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun HomeScreenPreview() {
-    HomeScreen(setOf("cart", "settings", "orders"), onOpen = {})
+    HomeScreen(setOf(FeatureId.CART, FeatureId.SETTINGS, FeatureId.ORDERS), onOpen = {})
 }

@@ -1,17 +1,10 @@
 import SwiftUI
 import Shared
 
-/// A home nav tile. `login` is the auth gate, not a tile.
-private struct HomeItem: Identifiable {
-    let id: String
-    let title: String
-}
-
-private let homeItems: [HomeItem] = [
-    HomeItem(id: "cart", title: "Cart"),
-    HomeItem(id: "settings", title: "Settings"),
-    HomeItem(id: "orders", title: "Orders"),
-]
+/// The home tile catalog, from the shared `FeatureId` enum (single source of ids + titles for both
+/// platforms — no more duplicated string list here). `login` is the auth gate, not a tile, so
+/// `homeTiles` already excludes it.
+private let homeTiles: [FeatureId] = HomeFeatures.shared.homeTiles
 
 struct ContentView: View {
     // The SwiftUI navigation back stack (the iOS counterpart of Android's Navigation 3 back stack).
@@ -20,7 +13,7 @@ struct ContentView: View {
     // The features compiled into this store's Shared framework build, aggregated by the Metro
     // graph (HomeFeatures wraps createGraph<AppGraph>().features). A tile is enabled only if its
     // feature shipped in this store.
-    private func isEnabled(_ id: String) -> Bool {
+    private func isEnabled(_ id: FeatureId) -> Bool {
         HomeFeatures.shared.isEnabled(id: id)
     }
 
@@ -31,16 +24,16 @@ struct ContentView: View {
                     .font(.title)
                     .padding(.bottom, 8)
 
-                ForEach(homeItems) { item in
-                    let enabled = isEnabled(item.id)
+                ForEach(homeTiles, id: \.self) { tile in
+                    let enabled = isEnabled(tile)
                     Button {
                         // A route only exists for a feature with a screen, and the tile is tappable
                         // only when the feature shipped — so an unshipped feature is never pushed.
-                        if let route = FeatureRoute(featureId: item.id) {
+                        if let route = FeatureRoute(featureId: tile) {
                             path.append(route)
                         }
                     } label: {
-                        Text(enabled ? item.title : "\(item.title) — not in this store")
+                        Text(enabled ? tile.title : "\(tile.title) — not in this store")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)

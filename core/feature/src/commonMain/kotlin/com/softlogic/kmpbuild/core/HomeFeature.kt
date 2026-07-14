@@ -6,6 +6,6 @@ package com.softlogic.kmpbuild.core
  * running app's `Set<HomeFeature>` contains exactly the features compiled into its store build.
  */
 interface HomeFeature {
-    val id: String
-    val title: String
+    val id: FeatureId
+    val title: String get() = id.title
 }

@@ -1,6 +1,7 @@
 package com.softlogic.kmpbuild.features.settings.real
 
 import com.softlogic.kmpbuild.core.AppScope
+import com.softlogic.kmpbuild.core.FeatureId
 import com.softlogic.kmpbuild.core.HomeFeature
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -12,6 +13,5 @@ import dev.zacsweers.metro.Inject
 @ContributesIntoSet(AppScope::class)
 @Inject
 class SettingsFeatureImpl : HomeFeature {
-    override val id: String = "settings"
-    override val title: String = "Settings"
+    override val id: FeatureId = FeatureId.SETTINGS
 }

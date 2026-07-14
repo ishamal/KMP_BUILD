@@ -19,14 +19,14 @@ class StoreFeaturesPlugin : Plugin<Project> {
             val android = target.extensions.getByType(ApplicationExtension::class.java)
 
             android.flavorDimensions += "store"
-            catalog.stores().keys.forEach { store ->
-                android.productFlavors.create(store) {
+            catalog.stores().forEach { store ->
+                android.productFlavors.create(store.storeName) {
                     dimension = "store"
                     applicationId = catalog.applicationId(store)
                     buildConfigField(
                         "String",
                         "BUSINESS_UNIT_DEFAULTS",
-                        "\"${catalog.businessUnitDefaults(store)}\"",
+                        "\"${store.businessUnitDefaults}\"",
                     )
                     // NOTE: which features a store ships is now sourced at runtime from the Metro
                     // graph (Set<HomeFeature> via @ContributesIntoSet), not a BuildConfig string.
@@ -37,11 +37,11 @@ class StoreFeaturesPlugin : Plugin<Project> {
             // processes the flavors — add the feature :real modules after evaluation so those
             // configurations exist.
             target.afterEvaluate {
-                catalog.stores().forEach { (store, features) ->
-                    features.forEach { feature ->
+                catalog.stores().forEach { store ->
+                    store.features.forEach { feature ->
                         target.dependencies.add(
-                            "${store}Implementation",
-                            target.project(":features:$feature:real"),
+                            "${store.storeName}Implementation",
+                            target.project(feature.realModulePath),
                         )
                     }
                 }

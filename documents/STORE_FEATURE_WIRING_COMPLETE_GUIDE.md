@@ -119,25 +119,72 @@ pluginManagement {
 ```kotlin
 package com.example.gradle
 
-/** One store's build-time definition — the single source of truth for what a store ships. */
-data class StoreDef(
-    val name: String,                       // flavor name + (optionally) applicationId suffix
-    val features: List<String>,             // bare feature names → :features:<name>:real modules
-    val businessUnitDefaults: String = "",  // (optional) any per-store string you bake into BuildConfig
-)
+/**
+ * Every feature that can ship in a store. An enum, not strings, so the compiler owns
+ * feature-name correctness: a typo can't exist in the STORES table, and the IDE
+ * autocompletes/refactors the names. Module paths are derived from the constant name.
+ */
+enum class Feature {
+    LOGIN, CART, ORDERS, SETTINGS;
 
-/** Every store. Add a store = add one line here. */
-internal val STORES: List<StoreDef> = listOf(
-    StoreDef("storeA", listOf("login", "cart", "orders")),
-    StoreDef("storeB", listOf("login", "cart", "settings")),
-    StoreDef("storeC", listOf("login", "orders")),
-    // …
-)
+    /** ORDERS -> "orders" — the bare name used in module paths. */
+    val moduleName: String get() = name.lowercase()
+    val apiModulePath: String get() = ":features:$moduleName:api"
+    val realModulePath: String get() = ":features:$moduleName:real"
+}
+
+/**
+ * Every store, as an enum — the single source of truth for what each store ships.
+ * Add a store = add one constant. The string form Gradle/Xcode need (flavor name,
+ * `-Pstore=` value, applicationId suffix) is derived once in [storeName].
+ */
+enum class Store(
+    val features: List<Feature>,            // compiler-checked — see Feature
+    val businessUnitDefaults: String = "",  // (optional) any per-store string for BuildConfig
+) {
+    STORE_A(listOf(Feature.LOGIN, Feature.CART, Feature.ORDERS)),
+    STORE_B(listOf(Feature.LOGIN, Feature.CART, Feature.SETTINGS)),
+    STORE_C(listOf(Feature.LOGIN, Feature.ORDERS)),
+    ;
+
+    /** STORE_A -> "storeA" — the Android flavor name, `-Pstore=` value, and appId suffix. */
+    val storeName: String = name.split('_')
+        .mapIndexed { i, part ->
+            if (i == 0) part.lowercase() else part.lowercase().replaceFirstChar { it.uppercaseChar() }
+        }
+        .joinToString("")
+
+    companion object {
+        /** The default store when `-Pstore=<store>` is not passed (used by iOS). */
+        val DEFAULT: Store = STORE_A
+
+        /** "storeB" (a `-Pstore=` value) -> [STORE_B], with a clear error for unknown names. */
+        fun byName(name: String): Store =
+            entries.firstOrNull { it.storeName == name }
+                ?: error("Unknown store '$name'. Known stores: ${entries.map { it.storeName }}")
+    }
+}
 ```
 **Why a Kotlin table?** It's compiler-checked, needs no file parsing, and editing it recompiles
 `build-logic` so Gradle's configuration cache invalidates automatically. (If you instead read external
 `.properties`/JSON at configure time, you must read them through a Gradle **`ValueSource`** or the
 config cache can serve stale data — avoided entirely here.)
+
+**Why enums (not strings) for both stores and features?** With strings, a typo like `"ordres"` or
+`"stroeB"` is only caught by runtime validation — at best. With enums, the typo **cannot be written**:
+the table only accepts declared constants, the IDE autocompletes them, and renaming is a
+compiler-checked refactor. The enums also centralize every derived string in one place — the
+feature→module-path convention (`apiModulePath`/`realModulePath`) and the store→flavor-name/`-Pstore`
+convention (`storeName`) — instead of string-templating at every call site. Strings survive only at
+the boundaries where Gradle/Xcode inherently speak text (flavor names, `-P` values), and each is
+*derived from* an enum, never typed by hand twice. Note what enums can *not* guarantee: that a
+feature's module actually exists on disk and is `include()`d — that stays with the plugin validation
+in Step 4.
+
+> **This enum is build-time only — it is not `HomeFeature` (Part II).** The enum lives on Gradle's
+> classpath and decides which modules to link; `HomeFeature` lives in `:core:feature`, ships in the
+> app, and is how linked features self-register at runtime. They can't share a type (`build-logic`
+> compiles before the app's modules exist) and don't need to: the build itself keeps them in sync.
 
 ---
 
@@ -149,29 +196,28 @@ The object your build scripts will call.
 ```kotlin
 package com.example.gradle
 
-open class StoreCatalogExtension(private val storeDefs: List<StoreDef>) {
+open class StoreCatalogExtension {
 
-    val selectedStore: String get() = SELECTED_STORE               // default when -Pstore not passed
-    val storeNames: Set<String> get() = storeDefs.map { it.name }.toSet()
+    val selectedStore: Store get() = Store.DEFAULT                 // default when -Pstore not passed
+    val storeNames: Set<String> get() = Store.entries.map { it.storeName }.toSet()
 
-    fun stores(): Map<String, List<String>> = storeDefs.associate { it.name to it.features }
-    fun featuresFor(store: String): List<String> = def(store).features
-    fun businessUnitDefaults(store: String): String = def(store).businessUnitDefaults           // optional
-    fun applicationId(store: String): String =                                                  // optional
-        "$BASE_APPLICATION_ID.${def(store).name.lowercase()}"
+    /** Every store, in declaration order. */
+    fun stores(): List<Store> = Store.entries
 
-    private fun def(store: String): StoreDef =
-        storeDefs.firstOrNull { it.name == store }
-            ?: error("Unknown store '$store'. Known stores: $storeNames")
+    /** "-Pstore=storeB" -> Store.STORE_B — the one string→enum boundary. */
+    fun storeFor(name: String): Store = Store.byName(name)
+
+    fun applicationId(store: Store): String =                                       // optional
+        "$BASE_APPLICATION_ID.${store.storeName.lowercase()}"
 
     companion object {
-        const val SELECTED_STORE = "storeA"                 // ← your default store
         const val BASE_APPLICATION_ID = "com.example.app"   // ← your app's base package (optional)
     }
 }
 ```
-> Keep the class `open` — Gradle decorates extensions and needs to subclass it. Only expose the methods
-> your build scripts actually call (drop `applicationId`/`businessUnitDefaults` if you don't need them).
+> Keep the class `open` — Gradle decorates extensions and needs to subclass it. The data itself lives
+> on the `Store` enum; this is just the script-facing surface. Only expose the methods your build
+> scripts actually call (drop `applicationId` if you don't need it).
 
 ---
 
@@ -190,21 +236,23 @@ class StoreCatalogPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         if (target.extensions.findByName("storeCatalog") != null) return   // idempotent
 
-        STORES.forEach { store ->
+        // Store and feature *names* are compiler-checked by the enums; the remaining failure mode
+        // is a Feature constant whose module was never created or never include()d — catch it here.
+        Store.entries.forEach { store ->
             store.features.forEach { feature ->
-                require(target.rootProject.findProject(":features:$feature:real") != null) {
-                    "Store '${store.name}' lists feature '$feature' but there is no module " +
-                        ":features:$feature:real. Fix STORES in build-logic/Stores.kt."
+                require(target.rootProject.findProject(feature.realModulePath) != null) {
+                    "Store '${store.storeName}' lists Feature.${feature.name} but there is no module " +
+                        "${feature.realModulePath}. Create/include the module or remove the constant."
                 }
             }
         }
 
-        target.extensions.create("storeCatalog", StoreCatalogExtension::class.java, STORES)
+        target.extensions.create("storeCatalog", StoreCatalogExtension::class.java)
     }
 }
 ```
-> Adapt `":features:$feature:real"` to **your** module path convention (check your
-> `settings.gradle.kts` `include(...)` lines — colons vs dashes matter).
+> Adapt the path convention in the `Feature` enum's `apiModulePath`/`realModulePath` to **your**
+> module layout (check your `settings.gradle.kts` `include(...)` lines — colons vs dashes matter).
 
 ---
 
@@ -229,23 +277,23 @@ class StoreFeaturesPlugin : Plugin<Project> {
             val android = target.extensions.getByType(ApplicationExtension::class.java)
 
             android.flavorDimensions += "store"
-            catalog.stores().keys.forEach { store ->
-                android.productFlavors.create(store) {
+            catalog.stores().forEach { store ->
+                android.productFlavors.create(store.storeName) {
                     dimension = "store"
                     applicationId = catalog.applicationId(store)                 // optional
                     buildConfigField("String", "BUSINESS_UNIT_DEFAULTS",         // optional
-                        "\"${catalog.businessUnitDefaults(store)}\"")
+                        "\"${store.businessUnitDefaults}\"")
                 }
             }
 
             // Flavor configurations (storeAImplementation, …) are created as AGP processes the flavors;
             // add the feature :real modules after evaluation so those configurations exist.
             target.afterEvaluate {
-                catalog.stores().forEach { (store, features) ->
-                    features.forEach { feature ->
+                catalog.stores().forEach { store ->
+                    store.features.forEach { feature ->
                         target.dependencies.add(
-                            "${store}Implementation",
-                            target.project(":features:$feature:real"),
+                            "${store.storeName}Implementation",
+                            target.project(feature.realModulePath),
                         )
                     }
                 }
@@ -288,22 +336,23 @@ plugins {
 }
 
 val storeCatalog = extensions.getByType<com.example.gradle.StoreCatalogExtension>()
-// orNull + isNotBlank so an empty `-Pstore=` (e.g. an unset env var from Xcode) falls back to the
-// default instead of failing with "Unknown store ''".
+// The -Pstore value is the one inherently-string boundary; storeFor() converts it to the typed
+// Store once (failing fast with the known names on a typo). orNull + isNotBlank so an empty
+// `-Pstore=` (e.g. an unset env var from Xcode) falls back to the default instead of failing.
 val store = providers.gradleProperty("store").orNull?.takeIf { it.isNotBlank() }
-    ?: storeCatalog.selectedStore
-val storeFeatures = storeCatalog.featuresFor(store)
+    ?.let { storeCatalog.storeFor(it) } ?: storeCatalog.selectedStore
+val storeFeatures = store.features
 
 kotlin {
     listOf(iosArm64(), iosSimulatorArm64()).forEach { it.binaries.framework {
         baseName = "Shared"
-        storeFeatures.forEach { export(project(":features:$it:api")) }   // export contracts to Swift
+        storeFeatures.forEach { export(project(it.apiModulePath)) }   // export contracts to Swift
     } }
     sourceSets {
         iosMain.dependencies {
             storeFeatures.forEach {
-                api(project(":features:$it:api"))             // exported contract
-                implementation(project(":features:$it:real")) // impl, linked not exported
+                api(project(it.apiModulePath))             // exported contract
+                implementation(project(it.realModulePath)) // impl, linked not exported
             }
         }
     }
@@ -436,14 +485,41 @@ other edit.
 Create one small common module (KMP, all your targets) that both the feature `:real` modules and the
 app graphs depend on. It holds two tiny things.
 
+`:core:feature/src/commonMain/kotlin/com/example/core/FeatureId.kt`
+```kotlin
+package com.example.core
+
+/**
+ * The runtime identity of every feature, as a closed enum — the runtime counterpart of the
+ * build-time Feature enum in build-logic (two worlds, deliberately separate types). Typed ids
+ * mean tile↔screen dispatch can't be broken by a typo, on either platform.
+ *
+ * [title] lives here (not only on HomeFeature) because the home screens need a title even for
+ * features NOT compiled into this store, to render the disabled tile. [isHomeTile] lets a
+ * shipped-but-not-a-tile feature (an auth gate like login) opt out of the home grid.
+ */
+enum class FeatureId(val title: String, val isHomeTile: Boolean = true) {
+    LOGIN("Login", isHomeTile = false),
+    CART("Cart"),
+    SETTINGS("Settings"),
+    ORDERS("Orders"),
+    ;
+
+    companion object {
+        /** Declaration-ordered home-grid tiles (the whole catalog, shipped or not). */
+        val homeTiles: List<FeatureId> = entries.filter { it.isHomeTile }
+    }
+}
+```
+
 `:core:feature/src/commonMain/kotlin/com/example/core/HomeFeature.kt`
 ```kotlin
 package com.example.core
 
 /** The multibound feature "identity" — the minimum the app needs to list a feature. */
 interface HomeFeature {
-    val id: String
-    val title: String
+    val id: FeatureId
+    val title: String get() = id.title
 }
 ```
 
@@ -496,8 +572,7 @@ import dev.zacsweers.metro.Inject
 @ContributesIntoSet(AppScope::class)   // "add me to the Set<HomeFeature> for AppScope"
 @Inject                                // Metro can construct me
 class OrdersFeatureImpl : HomeFeature {
-    override val id: String = "orders"
-    override val title: String = "Orders"
+    override val id: FeatureId = FeatureId.ORDERS   // typed — a typo can't compile
 }
 ```
 - **Single supertype** (`HomeFeature`) → Metro infers the bound type implicitly. If your impl
@@ -567,17 +642,34 @@ functions:
 // shared/src/iosMain/…/AppGraph.kt (alongside the iOS AppGraph)
 object HomeFeatures {
     private val features: Set<HomeFeature> by lazy { createGraph<AppGraph>().features }
-    val ids: List<String> get() = features.map { it.id }.sorted()
-    fun isEnabled(id: String): Boolean = features.any { it.id == id }
+    /** Every tile the home can show (whole catalog, shipped or not). */
+    val homeTiles: List<FeatureId> get() = FeatureId.homeTiles
+    fun isEnabled(id: FeatureId): Boolean = features.any { it.id == id }
 }
 ```
+A Kotlin enum bridges to Swift as a class with static entries (`FeatureId.cart`, `FeatureId.orders`,
+…), so Swift shares the same typed ids and titles — no duplicated string/title list on the iOS side:
 ```swift
-// ContentView.swift
-private func isEnabled(_ id: String) -> Bool {
+// ContentView.swift — the tile catalog comes from the shared enum
+private let homeTiles: [FeatureId] = HomeFeatures.shared.homeTiles
+
+private func isEnabled(_ id: FeatureId) -> Bool {
     HomeFeatures.shared.isEnabled(id: id)   // function interop is the robust path
 }
+
+// FeatureRoute.swift — typed mapping, no string matching
+init?(featureId: FeatureId) {
+    switch featureId {
+    case .cart: self = .cart
+    case .orders: self = .orders
+    case .settings: self = .settings
+    default: return nil        // required: a Kotlin enum bridges as a class, not a Swift enum
+    }
+}
 ```
-The `object` compiles into the Shared framework, so Swift sees it automatically — no extra export.
+Because `FeatureId` appears in the façade's public API, `:core:feature` must be **exported** into the
+framework: `export(project(":core:feature"))` in the framework block, and the iosMain dependency
+declared as `api(...)` (export requires an api dependency).
 
 Because UI is native per platform, each platform maps `id → screen` itself: Android in its navigation
 graph/composable registry, iOS in a Swift `switch` (or registry) over the ids. The shared code never
@@ -642,11 +734,12 @@ platforms.
 
 ## Adding a store or feature later
 
-- **New store:** add one `StoreDef` line to `STORES`. Android gets a new flavor; `-Pstore=<new>` works
-  on iOS. (No other build edits.)
+- **New store:** add one constant to the `Store` enum. Android gets a new flavor; `-Pstore=<new>`
+  works on iOS. (No other build edits.)
 - **New feature:** create `:features:<name>:api` + `:real`, `include(...)` them in
-  `settings.gradle.kts`, add the Metro annotation to its impl, then add the bare name to a store's
-  `features` list. Validation (Step 4) fails fast on a typo.
+  `settings.gradle.kts`, add the Metro annotation to its impl, add a constant to the `Feature` enum,
+  then add `Feature.<NAME>` to a store's list. The compiler catches name typos; validation (Step 4)
+  catches a constant whose module is missing.
 
 ---
 
@@ -692,14 +785,14 @@ platforms.
 **Part I — build wiring:**
 - [ ] Plugin package `com.example.gradle` → yours
 - [ ] Plugin ids `com.example.store-catalog` / `com.example.store-features` → yours
-- [ ] `BASE_APPLICATION_ID` and `SELECTED_STORE` in `StoreCatalogExtension`
-- [ ] Module path `":features:$feature:real"` (and `:api`) → your convention
-- [ ] The `STORES` list → your real stores and feature names
+- [ ] `BASE_APPLICATION_ID` in `StoreCatalogExtension` and `Store.DEFAULT` in the `Store` enum
+- [ ] The `Feature` enum's constants + `apiModulePath`/`realModulePath` convention → yours
+- [ ] The `Store` enum's constants (+ `storeName` derivation) → your real stores and feature lists
 - [ ] Drop `applicationId` / `businessUnitDefaults` / the whole iOS step if you don't need them
 - [ ] `agp` version entry present in `gradle/libs.versions.toml`
 
 **Part II — feature registration:**
-- [ ] `:core:feature` module with `HomeFeature` + `AppScope` (your package)
+- [ ] `:core:feature` module with `FeatureId` (enum) + `HomeFeature` + `AppScope` (your package)
 - [ ] Metro plugin on every `:real` module and on each graph module (`:androidApp`, `shared`)
 - [ ] `metro` version in the catalog matches your Kotlin version
 - [ ] Each `:real` impl: `@ContributesIntoSet(AppScope::class) @Inject class … : HomeFeature`
@@ -711,8 +804,9 @@ platforms.
 
 ## One-paragraph recap
 
-Put your store→feature table in a typed Kotlin list (`STORES`) inside an included `build-logic` build.
-A `store-catalog` plugin exposes it as a `storeCatalog` extension and validates feature names; a
+Put your store→feature table in typed Kotlin enums (`Store`, `Feature`) inside an included
+`build-logic` build — every name is compiler-checked, and the strings Gradle needs are derived once.
+A `store-catalog` plugin exposes it as a `storeCatalog` extension and validates feature modules; a
 `store-features` plugin turns it into Android product flavors that each link only their store's feature
 `:real` modules — build-time exclusion (on iOS, the shared module's `-Pstore` loop does the same for
 the framework). Then let those modules **announce themselves**: each `:real` contributes an

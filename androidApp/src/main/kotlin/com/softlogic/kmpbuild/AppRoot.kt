@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import com.softlogic.kmpbuild.core.AndroidFeatureScreen
+import com.softlogic.kmpbuild.core.FeatureId
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
 
@@ -27,7 +28,7 @@ import dev.zacsweers.metrox.viewmodel.MetroViewModelFactory
  */
 @Composable
 fun AppRoot(
-    enabledFeatures: Set<String>,
+    enabledFeatures: Set<FeatureId>,
     screens: Set<AndroidFeatureScreen>,
     viewModelFactory: MetroViewModelFactory,
 ) {

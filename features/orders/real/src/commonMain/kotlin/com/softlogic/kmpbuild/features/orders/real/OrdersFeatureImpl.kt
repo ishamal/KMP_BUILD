@@ -1,6 +1,7 @@
 package com.softlogic.kmpbuild.features.orders.real
 
 import com.softlogic.kmpbuild.core.AppScope
+import com.softlogic.kmpbuild.core.FeatureId
 import com.softlogic.kmpbuild.core.HomeFeature
 import dev.zacsweers.metro.ContributesIntoSet
 import dev.zacsweers.metro.Inject
@@ -13,6 +14,5 @@ import dev.zacsweers.metro.Inject
 @ContributesIntoSet(AppScope::class)
 @Inject
 class OrdersFeatureImpl : HomeFeature {
-    override val id: String = "orders"
-    override val title: String = "Orders"
+    override val id: FeatureId = FeatureId.ORDERS
 }

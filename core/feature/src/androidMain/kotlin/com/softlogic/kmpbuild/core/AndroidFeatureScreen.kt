@@ -14,8 +14,8 @@ import androidx.compose.runtime.Composable
  * It stays out of commonMain so `@Composable` never leaks into the iOS/common targets.
  */
 interface AndroidFeatureScreen {
-    /** Matches the corresponding [HomeFeature.id] (e.g. "orders"); the nav host dispatches by this. */
-    val id: String
+    /** Matches the corresponding [HomeFeature.id]; the nav host dispatches by this. */
+    val id: FeatureId
 
     /** The feature's screen. [onBack] pops it off the nav back stack. */
     @Composable

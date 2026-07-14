@@ -14,24 +14,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-
-/** Nav tiles the home can show. `login` is the auth gate, not a home tile. */
-private val HOME_ITEMS: List<Pair<String, String>> = listOf(
-    "cart" to "Cart",
-    "settings" to "Settings",
-    "orders" to "Orders",
-)
+import com.softlogic.kmpbuild.core.FeatureId
 
 /**
- * Native Android Jetpack Compose home. [enabledFeatures] are the feature ids compiled into this
- * store's flavor, aggregated at runtime from the Metro graph (Set<HomeFeature> via
+ * Native Android Jetpack Compose home. The tile catalog is [FeatureId.homeTiles] (every tile the app
+ * knows about, shipped or not — `login` is the auth gate, not a tile). [enabledFeatures] are the ids
+ * compiled into this store's flavor, aggregated at runtime from the Metro graph (Set<HomeFeature> via
  * @ContributesIntoSet) — a tile is tappable only if its feature shipped. [onOpen] navigates to a
  * feature's screen (see AppRoot).
  */
 @Composable
 fun HomeScreen(
-    enabledFeatures: Set<String>,
-    onOpen: (String) -> Unit,
+    enabledFeatures: Set<FeatureId>,
+    onOpen: (FeatureId) -> Unit,
 ) {
     MaterialTheme {
         Column(
@@ -45,14 +40,14 @@ fun HomeScreen(
         ) {
             Text("Home (Android)", style = MaterialTheme.typography.headlineMedium)
 
-            HOME_ITEMS.forEach { (id, title) ->
+            FeatureId.homeTiles.forEach { id ->
                 val enabled = id in enabledFeatures
                 Button(
                     onClick = { onOpen(id) },
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (enabled) title else "$title — not in this store")
+                    Text(if (enabled) id.title else "${id.title} — not in this store")
                 }
             }
         }

@@ -1,4 +1,5 @@
 import Foundation
+import Shared
 
 /// Typed SwiftUI navigation routes — the iOS counterpart of Android's `AppKey`. One case per feature
 /// screen the app can push onto the `NavigationStack`. `login` is intentionally absent: it's the auth
@@ -11,13 +12,13 @@ enum FeatureRoute: Hashable {
     case orders
     case settings
 
-    /// Maps a home tile's feature id (aggregated from the Metro graph via `HomeFeatures`) to its route,
-    /// or `nil` if the id has no screen.
-    init?(featureId: String) {
+    /// Maps a home tile's shared `FeatureId` (the Kotlin enum, bridged as `FeatureId.cart` etc.) to
+    /// its route, or `nil` if the id has no screen. No string matching — a typo can't compile.
+    init?(featureId: FeatureId) {
         switch featureId {
-        case "cart": self = .cart
-        case "orders": self = .orders
-        case "settings": self = .settings
+        case .cart: self = .cart
+        case .orders: self = .orders
+        case .settings: self = .settings
         default: return nil
         }
     }
