@@ -3,6 +3,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidMultiplatformLibrary)
+    // The feature's native Android screen lives in androidMain (Jetpack Compose).
+    alias(libs.plugins.composeMultiplatform)
+    alias(libs.plugins.composeCompiler)
     alias(libs.plugins.metro)
 }
 
@@ -24,6 +27,20 @@ kotlin {
         commonMain.dependencies {
             api(project(":features:orders:api"))
             implementation(project(":core:feature"))
+            // On all targets so the Compose compiler's version check passes on iOS too; the actual
+            // Compose UI is androidMain-only. See core:feature/build.gradle.kts for the rationale.
+            implementation(libs.compose.runtime)
+        }
+        androidMain.dependencies {
+            // Native Android (Jetpack Compose) screen + ViewModel for this feature.
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.material3)
+            implementation(libs.compose.ui)
+            implementation(libs.androidx.lifecycle.viewmodelCompose)
+            implementation(libs.androidx.lifecycle.runtimeCompose)
+            // Metro-injected ViewModels: @ContributesIntoMap + @ViewModelKey, retrieved via metroViewModel().
+            implementation(libs.metrox.viewmodel)
+            implementation(libs.metrox.viewmodel.compose)
         }
     }
 }

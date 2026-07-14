@@ -28,6 +28,18 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+
+    // Per-feature ViewModels (one presentation class per feature) + Compose viewModel() helper.
+    implementation(libs.androidx.lifecycle.viewmodelCompose)
+    implementation(libs.androidx.lifecycle.runtimeCompose)
+
+    // Jetpack Navigation 3 — typed back stack + NavDisplay for home <-> feature-screen navigation.
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+
+    // Metro ViewModel factory + LocalMetroViewModelFactory (provided at the nav-host root).
+    implementation(libs.metrox.viewmodel)
+    implementation(libs.metrox.viewmodel.compose)
 }
 
 android {

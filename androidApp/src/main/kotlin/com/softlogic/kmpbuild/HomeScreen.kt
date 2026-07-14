@@ -11,10 +11,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -29,12 +25,15 @@ private val HOME_ITEMS: List<Pair<String, String>> = listOf(
 /**
  * Native Android Jetpack Compose home. [enabledFeatures] are the feature ids compiled into this
  * store's flavor, aggregated at runtime from the Metro graph (Set<HomeFeature> via
- * @ContributesIntoSet) — a tile is tappable only if its feature shipped.
+ * @ContributesIntoSet) — a tile is tappable only if its feature shipped. [onOpen] navigates to a
+ * feature's screen (see AppRoot).
  */
 @Composable
-fun HomeScreen(enabledFeatures: Set<String>) {
+fun HomeScreen(
+    enabledFeatures: Set<String>,
+    onOpen: (String) -> Unit,
+) {
     MaterialTheme {
-        var opened by remember { mutableStateOf<String?>(null) }
         Column(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.primaryContainer)
@@ -49,15 +48,13 @@ fun HomeScreen(enabledFeatures: Set<String>) {
             HOME_ITEMS.forEach { (id, title) ->
                 val enabled = id in enabledFeatures
                 Button(
-                    onClick = { opened = id },
+                    onClick = { onOpen(id) },
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(if (enabled) title else "$title — not in this store")
                 }
             }
-
-            opened?.let { Text("Opened \"$it\"") }
         }
     }
 }

@@ -6,16 +6,23 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.softlogic.kmpbuild.core.MetroAppComponentProvider
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // The features compiled into this store's build, aggregated by Metro (@ContributesIntoSet).
-        val enabledFeatures = createAppGraph().features.map { it.id }.toSet()
+        // The app-scoped graph is created in KmpBuildApp; read the store's features + contributed
+        // screens + ViewModel factory from it (aggregated by Metro) rather than rebuilding per Activity.
+        val enabledFeatures = (application as MetroAppComponentProvider).features.map { it.id }.toSet()
+        val androidProvider = application as AndroidScreenProvider
         setContent {
-            HomeScreen(enabledFeatures)
+            AppRoot(
+                enabledFeatures = enabledFeatures,
+                screens = androidProvider.androidScreens,
+                viewModelFactory = androidProvider.metroViewModelFactory,
+            )
         }
     }
 }
@@ -23,5 +30,5 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun HomeScreenPreview() {
-    HomeScreen(setOf("cart", "settings", "orders"))
+    HomeScreen(setOf("cart", "settings", "orders"), onOpen = {})
 }

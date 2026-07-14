@@ -4,7 +4,7 @@ import com.softlogic.kmpbuild.core.AppScope
 import com.softlogic.kmpbuild.core.HomeFeature
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Multibinds
-import dev.zacsweers.metro.createGraph
+import dev.zacsweers.metro.createGraphFactory
 
 /**
  * The iOS Metro graph, compiled into the Shared framework. It aggregates every
@@ -16,6 +16,13 @@ import dev.zacsweers.metro.createGraph
 interface AppGraph {
     @Multibinds(allowEmpty = true)
     val features: Set<HomeFeature>
+
+    // Factory entry point — mirrors :androidApp/AppGraph.kt. Add @Provides params to create() to
+    // feed platform values into the graph.
+    @DependencyGraph.Factory
+    interface Factory {
+        fun create(): AppGraph
+    }
 }
 
 /**
@@ -24,7 +31,7 @@ interface AppGraph {
  * bridge as an `NSSet` and be awkward from Swift. Replaces the old generated `StoreInfo`.
  */
 object HomeFeatures {
-    private val features: Set<HomeFeature> by lazy { createGraph<AppGraph>().features }
+    private val features: Set<HomeFeature> by lazy { createGraphFactory<AppGraph.Factory>().create().features }
 
     val ids: List<String> get() = features.map { it.id }.sorted()
 
