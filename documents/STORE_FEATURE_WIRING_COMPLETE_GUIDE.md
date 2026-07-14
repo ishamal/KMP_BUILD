@@ -21,15 +21,16 @@ the feature identity contract carries **data, not UI**, and there is **one DI gr
 
 ```
 build-logic/                       (a separate "included build" that produces Gradle plugins)
-  Stores.kt                        → STORES: the typed store→feature table (source of truth)
+  Stores.kt                        → Store + Feature enums: the typed catalog (source of truth)
   StoreCatalogExtension.kt         → the `storeCatalog` object build scripts read
-  StoreCatalogPlugin.kt            → registers `storeCatalog` + validates feature names
+  StoreCatalogPlugin.kt            → registers `storeCatalog` + validates feature modules
   StoreFeaturesPlugin.kt           → Android: one product flavor per store + links its features
+  StoreIosFeaturesPlugin.kt        → iOS: per-store framework exports + linked features  (optional)
 main build:
   settings.gradle.kts              → includeBuild("build-logic")
-  androidApp/build.gradle.kts      → id("com.example.store-features")   (Android flavors)
-  shared/build.gradle.kts          → id("com.example.store-catalog")    (iOS framework)  (optional)
-  core/feature/                    → HomeFeature + AppScope (the cross-feature identity contract)
+  androidApp/build.gradle.kts      → id("com.example.store-features")       (Android flavors)
+  shared/build.gradle.kts          → id("com.example.store-ios-features")   (iOS framework)  (optional)
+  core/feature/                    → FeatureId + HomeFeature + AppScope (cross-feature contracts)
   features/<name>/api + real       → one module pair per feature; :real self-registers via Metro
 ```
 
@@ -83,6 +84,9 @@ repositories { google(); mavenCentral(); gradlePluginPortal() }
 dependencies {
     // Needed so the Android convention plugin can configure the Application DSL (product flavors).
     implementation("com.android.tools.build:gradle:${libs.versions.agp.get()}")
+    // Needed so the iOS convention plugin can configure the KMP DSL (framework exports,
+    // source-set dependencies). Same version as the app's Kotlin. (Optional — Step 7.)
+    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.get()}")
 }
 
 gradlePlugin {
@@ -94,6 +98,10 @@ gradlePlugin {
         register("storeFeatures") {
             id = "com.example.store-features"
             implementationClass = "com.example.gradle.StoreFeaturesPlugin"
+        }
+        register("storeIosFeatures") {                      // optional — Step 7
+            id = "com.example.store-ios-features"
+            implementationClass = "com.example.gradle.StoreIosFeaturesPlugin"
         }
     }
 }
@@ -326,42 +334,81 @@ Delete any old inline flavor/feature-dependency loops — the plugin now owns th
 
 ---
 
-## Step 7 — Apply on iOS **(optional — only if you ship an iOS framework)**
+## Step 7 — The iOS convention plugin **(optional — only if you ship an iOS framework)**
 
-In `shared/build.gradle.kts`:
+The iOS counterpart of Step 5, and the same division of labour: the store-driven wiring lives in a
+plugin; the shared module's build script keeps only module-specific facts (targets, framework name).
+
+`build-logic/src/main/kotlin/com/example/gradle/StoreIosFeaturesPlugin.kt`
 ```kotlin
-plugins {
-    // …kotlin multiplatform etc…
-    id("com.example.store-catalog")
-}
+package com.example.gradle
 
-val storeCatalog = extensions.getByType<com.example.gradle.StoreCatalogExtension>()
-// The -Pstore value is the one inherently-string boundary; storeFor() converts it to the typed
-// Store once (failing fast with the known names on a typo). orNull + isNotBlank so an empty
-// `-Pstore=` (e.g. an unset env var from Xcode) falls back to the default instead of failing.
-val store = providers.gradleProperty("store").orNull?.takeIf { it.isNotBlank() }
-    ?.let { storeCatalog.storeFor(it) } ?: storeCatalog.selectedStore
-val storeFeatures = store.features
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.plugin.mpp.Framework
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
-kotlin {
-    listOf(iosArm64(), iosSimulatorArm64()).forEach { it.binaries.framework {
-        baseName = "Shared"
-        storeFeatures.forEach { export(project(it.apiModulePath)) }   // export contracts to Swift
-    } }
-    sourceSets {
-        iosMain.dependencies {
-            storeFeatures.forEach {
-                api(project(it.apiModulePath))             // exported contract
-                implementation(project(it.realModulePath)) // impl, linked not exported
+class StoreIosFeaturesPlugin : Plugin<Project> {
+    override fun apply(target: Project) {
+        target.pluginManager.apply(StoreCatalogPlugin::class.java)
+        val catalog = target.extensions.getByType(StoreCatalogExtension::class.java)
+
+        // iOS has no Gradle flavors: the store comes from -Pstore (the one string boundary).
+        // orNull + isNotBlank so an empty `-Pstore=` (unset env var from Xcode) falls back to
+        // the default instead of failing with "Unknown store ''".
+        val store = target.providers.gradleProperty("store").orNull
+            ?.takeIf { it.isNotBlank() }
+            ?.let { catalog.storeFor(it) }
+            ?: catalog.selectedStore
+
+        target.pluginManager.withPlugin("org.jetbrains.kotlin.multiplatform") {  // wait for KMP
+            val kotlin = target.extensions.getByType(KotlinMultiplatformExtension::class.java)
+
+            // configureEach is lazy — it applies to the frameworks whenever the module's script
+            // defines them, so plugin/script ordering doesn't matter.
+            kotlin.targets.withType(KotlinNativeTarget::class.java).configureEach {
+                binaries.withType(Framework::class.java).configureEach {
+                    export(target.project(":core:feature"))   // FeatureId/HomeFeature for Swift
+                    store.features.forEach { export(target.project(it.apiModulePath)) }
+                }
+            }
+
+            kotlin.sourceSets.matching { it.name == "iosMain" }.configureEach {
+                dependencies {
+                    api(target.project(":core:feature"))       // export() requires api(...)
+                    store.features.forEach {
+                        api(target.project(it.apiModulePath))              // exported contract
+                        implementation(target.project(it.realModulePath))  // linked, not exported
+                    }
+                }
             }
         }
     }
 }
 ```
-On iOS there are no Gradle flavors, so the store is chosen with **`-Pstore=<store>`** (default =
-`selectedStore`). Only that store's feature modules are linked/exported into the single framework —
-build-time exclusion, same as Android. (From Xcode, pass the store through an xcconfig variable into
-the Gradle invocation of your framework-embedding build phase.)
+Register it in `build-logic`'s `gradlePlugin` block (Step 1b) and add the KGP API dependency
+(`org.jetbrains.kotlin:kotlin-gradle-plugin`) so the plugin can see the KMP DSL types.
+
+`shared/build.gradle.kts` then shrinks to module-specific facts:
+```kotlin
+plugins {
+    // …kotlin multiplatform etc…
+    id("com.example.store-ios-features")   // applies store-catalog itself
+}
+
+kotlin {
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { it.binaries.framework {
+        baseName = "Shared"
+        isStatic = true
+        // Per-store exports + iosMain feature deps are added by the store-ios-features plugin.
+    } }
+}
+```
+Only the selected store's feature modules are linked/exported into the single framework — build-time
+exclusion, same as Android. (From Xcode, pass the store through an xcconfig variable into the Gradle
+invocation of your framework-embedding build phase; a catalog-driven task can scaffold one xcconfig
+per store so the catalog stays the single source there too.)
 
 ---
 
@@ -668,8 +715,7 @@ init?(featureId: FeatureId) {
 }
 ```
 Because `FeatureId` appears in the façade's public API, `:core:feature` must be **exported** into the
-framework: `export(project(":core:feature"))` in the framework block, and the iosMain dependency
-declared as `api(...)` (export requires an api dependency).
+framework with an `api(...)` dependency — the `store-ios-features` plugin (Step 7) already does both.
 
 Because UI is native per platform, each platform maps `id → screen` itself: Android in its navigation
 graph/composable registry, iOS in a Swift `switch` (or registry) over the ids. The shared code never
@@ -784,7 +830,7 @@ platforms.
 
 **Part I — build wiring:**
 - [ ] Plugin package `com.example.gradle` → yours
-- [ ] Plugin ids `com.example.store-catalog` / `com.example.store-features` → yours
+- [ ] Plugin ids `com.example.store-catalog` / `store-features` / `store-ios-features` → yours
 - [ ] `BASE_APPLICATION_ID` in `StoreCatalogExtension` and `Store.DEFAULT` in the `Store` enum
 - [ ] The `Feature` enum's constants + `apiModulePath`/`realModulePath` convention → yours
 - [ ] The `Store` enum's constants (+ `storeName` derivation) → your real stores and feature lists
